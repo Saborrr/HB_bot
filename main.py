@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 from aiogram import Bot, Dispatcher
 
@@ -8,17 +9,22 @@ from config import TOKEN
 
 
 bot = Bot(token=TOKEN)
-dp = Dispatcher(bot)
+dp = Dispatcher()
 
 
 @dp.message(CommandStart())
 async def cmd_start(message: Message):
-    await message.answer("Hello, world!")
+    """Функция приветствия."""
+    text = (f'{message.from_user.full_name}, приветствуем Вас 😊\n')
+    await message.answer(text=text)
 
 
 async def main():
     await dp.start_polling(bot)
 
-    if __name__ == "__main__":
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    try:
         asyncio.run(main())
-        print("Bot started")
+    except KeyboardInterrupt:
+        print("Bot stopped")
