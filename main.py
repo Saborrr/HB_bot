@@ -12,6 +12,7 @@ dp = Dispatcher()
 
 
 async def main():
+    # запускаем функцию async_main для создания базы данных
     await async_main()
     dp.include_router(router)
     await dp.start_polling(bot)
