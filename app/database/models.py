@@ -1,4 +1,4 @@
-from sqlalchemy import BigInteger, String, ForeignKey
+from sqlalchemy import BigInteger, Date, String, ForeignKey
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.ext.asyncio import (AsyncAttrs, async_sessionmaker,
                                     create_async_engine)
@@ -28,13 +28,14 @@ class Category(Base):
     name: Mapped[str] = mapped_column(String(25))
 
 
-class Item(Base):
-    __tablename__ = "items"
+class Personal(Base):
+    __tablename__ = "personals"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(25))
-    description: Mapped[str] = mapped_column(String(120))
-    price: Mapped[int] = mapped_column()
+    surname: Mapped[str] = mapped_column(String(20))
+    name: Mapped[str] = mapped_column(String(15))
+    name_2: Mapped[str] = mapped_column(String(15))
+    birthday: Mapped[Date] = mapped_column(Date)
     category: Mapped[int] = mapped_column(ForeignKey("categories.id"))
 
 
