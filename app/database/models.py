@@ -1,13 +1,14 @@
+import os
 from sqlalchemy import Column, Integer, String, func
 from sqlalchemy.ext.asyncio import (AsyncSession, create_async_engine)
 from sqlalchemy import select
 from datetime import date, datetime
 from sqlalchemy.orm import sessionmaker, declarative_base
-from config import DATABASE_URL
 from sqlalchemy.sql import text
+from dotenv import load_dotenv
 
-
-engine = create_async_engine(DATABASE_URL, echo=True, future=True)
+load_dotenv()
+engine = create_async_engine(os.getenv('DATABASE_URL'), echo=True, future=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine,
                             class_=AsyncSession)
 

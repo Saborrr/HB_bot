@@ -13,6 +13,7 @@ magic-filter==1.0.12
 multidict==6.0.5
 pydantic==2.8.2
 pydantic_core==2.20.1
+python-dotenv==1.0.1
 SQLAlchemy==2.0.31
 typing_extensions==4.12.2
 yarl==1.9.4
