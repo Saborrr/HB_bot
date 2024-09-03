@@ -13,11 +13,14 @@ router = Router()
 @router.message(CommandStart())
 async def cmd_start(message: Message):
     """Функция приветствия."""
-    text = (f"{message.from_user.full_name}, приветствуем Вас 😊\n")
+    text = (f"{message.from_user.full_name}, приветствуем Вас 😊\n"
+            "/today - показать у кого сегодня ДР\n"
+            "/months - список ДР по месяцам"
+            )
     await message.answer(text=text, reply_markup=await kb.inline_months())
 
 
-@router.message(Command("birthdays"))
+@router.message(Command("months"))
 async def birthdays_command(message: types.Message):
     keyboard = await kb.inline_months()
     await message.answer("Выберите месяц:", reply_markup=keyboard)
@@ -42,6 +45,7 @@ async def birthdays_by_month(callback_query: CallbackQuery, state: FSMContext):
     Формирование текста сообщения с информацией о днях рождения сотрудников.
     """
     if employees:
+        employees.sort(key=lambda emp: emp.birth_date.day)
         text = "\n".join(
             [f"{emp.full_name} - {emp.birth_date.strftime('%d.%m.%Y')}"
              for emp in employees]
@@ -57,6 +61,7 @@ async def birthdays_today_command(message: types.Message):
     async with SessionLocal() as session:
         employees = await Employee.get_by_today(session)
     if employees:
+        employees.sort(key=lambda emp: emp.birth_date.day)
         text = "\n".join([f"{emp.full_name} - {emp.age} лет"
                           for emp in employees])
     else:
