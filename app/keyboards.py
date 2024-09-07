@@ -3,10 +3,10 @@ from aiogram.types import (InlineKeyboardButton, ReplyKeyboardMarkup,
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 
-main = ReplyKeyboardMarkup(keyboard=[
-    [KeyboardButton(text='Главное меню')],
-    [KeyboardButton(text='Месяц'), KeyboardButton(text='Сегодня')]
-], resize_keyboard=True, input_field_placeholder='Выберите пункт меню.')
+# main = ReplyKeyboardMarkup(keyboard=[
+#    [KeyboardButton(text='Главное меню')],
+#    [KeyboardButton(text='Месяц'), KeyboardButton(text='Сегодня')]
+# ], resize_keyboard=True, input_field_placeholder='Выберите пункт меню.')
 
 
 months = {

@@ -3,8 +3,8 @@ from aiogram.filters import CommandStart, Command
 from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 import app.keyboards as kb
-from app.database.models import Employee
-from app.database.models import SessionLocal
+from app.database.models import Employee, SessionLocal, is_allowed
+from datetime import datetime as dt
 
 
 router = Router()
@@ -12,12 +12,17 @@ router = Router()
 
 @router.message(CommandStart())
 async def cmd_start(message: Message):
-    """Функция приветствия."""
-    text = (f"{message.from_user.full_name}, приветствуем Вас 😊\n"
-            "/today - показать у кого сегодня ДР\n"
-            "/months - список ДР по месяцам"
-            )
-    await message.answer(text=text, reply_markup=await kb.inline_months())
+    """Проверяем, есть ли доступ у пользователя"""
+    user_id = message.from_user.id
+    if not is_allowed(user_id):
+        await message.reply("У вас нет доступа к этому боту ⛔️.")
+    else:
+        """Функция приветствия."""
+        text = (f"{message.from_user.full_name}, приветствуем Вас 😊\n"
+                "/today - показать у кого сегодня ДР\n"
+                "/months - список ДР по месяцам"
+                )
+        await message.answer(text=text, reply_markup=await kb.inline_months())
 
 
 @router.message(Command("months"))
@@ -61,7 +66,8 @@ async def birthdays_today_command(message: types.Message):
     async with SessionLocal() as session:
         employees = await Employee.get_by_today(session)
     if employees:
-        employees.sort(key=lambda emp: emp.birth_date.day)
+        employees.sort(key=lambda emp: dt.strptime(
+            emp.birth_date, '%d.%m.%Y').day)
         text = "\n".join([f"{emp.full_name} - {emp.age} лет"
                           for emp in employees])
     else:

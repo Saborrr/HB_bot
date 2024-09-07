@@ -9,6 +9,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 engine = create_async_engine(os.getenv('DATABASE_URL'), echo=True, future=True)
+# Получаем строку с разрешенными пользователями из переменной окружения
+allowed_users_str = os.getenv('ALLOWED_USERS', '')
+# Преобразуем строку в список целых чисел
+ALLOWED_USERS = tuple(int(user_id) for user_id in allowed_users_str.split(','))
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine,
                             class_=AsyncSession)
 
@@ -64,6 +68,11 @@ class Employee(Base):
                 today.month, today.day) < (birth_date.month, birth_date.day)
             employee.age = calclc_age_year - calclc_age_month_and_day
         return employees
+
+
+def is_allowed(user_id):
+    """Проверка разрешенного доступа пользователя."""
+    return user_id in ALLOWED_USERS
 
 
 async def init_db():
