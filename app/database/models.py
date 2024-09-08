@@ -75,6 +75,24 @@ def is_allowed(user_id):
     return user_id in ALLOWED_USERS
 
 
+async def find_employee_by_surname(session: AsyncSession, surname: str):
+    """Поиск сотрудника по фамилии."""
+    async with SessionLocal() as session:
+        result = await session.execute(
+            select(Employee).where(Employee.full_name.ilike(f'%{surname}%'))
+        )
+        employees = result.scalars().all()
+    return employees
+
+
+def calculate_age(birth_date):
+    # Проверка на тип birth_date и расчет возраста
+    today = datetime.today()
+    calc_year = today.year - birth_date.year
+    calc_date = (today.month, today.day) < (birth_date.month, birth_date.day)
+    return calc_year - calc_date
+
+
 async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
