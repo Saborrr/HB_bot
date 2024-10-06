@@ -1,6 +1,7 @@
 # HB_bot
 Бот для напоминания дней рождения.
 
+![image_hb_bot](https://github.com/user-attachments/assets/ee323bf1-2753-4354-a8b5-3071fa4ff0e0)
 
 
 ## Стек технологий:
