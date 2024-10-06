@@ -14,7 +14,7 @@
 
 
 > [!IMPORTANT]
-> Перед всеми манипуляциями, предпологается, что Вы уже создали бота в Telegram через @BotFather. 
+> Перед всеми манипуляциями, предпологается, что Вы уже создали бота в Telegram через @BotFather.     
 > Базу данных можно использовать и SQLite, просто заменив строку в настройках "DATABASE_URL" на: 
 > DATABASE_URL=sqlite+aiosqlite:///db.sqlite3 
 
@@ -64,3 +64,6 @@ ALLOWED_USERS=1234567,12345678
 ```python
 python main.py
 ```
+
+## Автор:
+[Александр Санычев](https://github.com/Saborrr)
