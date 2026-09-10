@@ -1,0 +1,214 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Ruff
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip "setuptools>=83"
+      - run: python -m pip install --disable-pip-version-check -e ".[dev]"
+      - run: ruff check .
+      - run: ruff format --check .
+
+  test:
+    name: Python ${{ matrix.python-version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - run: python -m pip install --upgrade pip "setuptools>=83"
+      - run: python -m pip install --disable-pip-version-check -e ".[dev]"
+      - run: pytest
+
+  security:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip "setuptools>=83"
+      - run: python -m pip install --disable-pip-version-check -e ".[dev]"
+      - run: pip-audit
+
+  package:
+    name: Installed wheel smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip "setuptools>=83" build
+      - run: python -m build --wheel
+      - run: |
+          python -m venv /tmp/hb-wheel-smoke
+          /tmp/hb-wheel-smoke/bin/pip install dist/*.whl
+          DATABASE_URL=sqlite+aiosqlite:////tmp/hb-wheel.sqlite3 \
+            /tmp/hb-wheel-smoke/bin/hb-migrate
+          test "$(sqlite3 /tmp/hb-wheel.sqlite3 'select version_num from alembic_version')" = "0002"
+
+  postgres:
+    name: PostgreSQL migration smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: hb_bot
+          POSTGRES_USER: hb_bot
+          POSTGRES_PASSWORD: ci-only-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U hb_bot -d hb_bot"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip "setuptools>=83"
+      - run: python -m pip install --disable-pip-version-check .
+      - name: Fresh PostgreSQL migration
+        env:
+          DATABASE_URL: postgresql+asyncpg://hb_bot:ci-only-password@localhost:5432/hb_bot
+        run: hb-migrate
+      - name: Verify current revision
+        env:
+          DATABASE_URL: postgresql+asyncpg://hb_bot:ci-only-password@localhost:5432/hb_bot
+        run: |
+          python - <<'PY'
+          import asyncio
+          import asyncpg
+
+          async def verify():
+              connection = await asyncpg.connect(
+                  user="hb_bot", password="ci-only-password", database="hb_bot", host="localhost"
+              )
+              try:
+                  revision = await connection.fetchval("SELECT version_num FROM alembic_version")
+                  assert revision == "0002"
+                  column = await connection.fetchrow(
+                      "SELECT data_type, character_maximum_length, is_nullable "
+                      "FROM information_schema.columns "
+                      "WHERE table_name='notification_deliveries' AND column_name='owner_token'"
+                  )
+                  assert tuple(column) == ("character varying", 36, "NO")
+              finally:
+                  await connection.close()
+
+          asyncio.run(verify())
+          PY
+      - name: Prepare legacy PostgreSQL database
+        run: |
+          python - <<'PY'
+          import asyncio
+          import asyncpg
+
+          async def prepare():
+              admin = await asyncpg.connect(
+                  user="hb_bot", password="ci-only-password", database="postgres", host="localhost"
+              )
+              try:
+                  await admin.execute("CREATE DATABASE hb_legacy OWNER hb_bot")
+              finally:
+                  await admin.close()
+              legacy = await asyncpg.connect(
+                  user="hb_bot", password="ci-only-password", database="hb_legacy", host="localhost"
+              )
+              try:
+                  await legacy.execute(
+                      "CREATE TABLE employees ("
+                      "id SERIAL PRIMARY KEY, full_name VARCHAR, birth_date VARCHAR, age INTEGER)"
+                  )
+                  await legacy.execute(
+                      "INSERT INTO employees (full_name, birth_date, age) VALUES ($1, $2, $3)",
+                      "Иванов Иван", "29.02", 35,
+                  )
+              finally:
+                  await legacy.close()
+
+          asyncio.run(prepare())
+          PY
+      - name: Legacy PostgreSQL migration
+        env:
+          DATABASE_URL: postgresql+asyncpg://hb_bot:ci-only-password@localhost:5432/hb_legacy
+        run: hb-migrate
+      - name: Verify migrated legacy row
+        run: |
+          python - <<'PY'
+          import asyncio
+          import asyncpg
+
+          async def verify():
+              connection = await asyncpg.connect(
+                  user="hb_bot", password="ci-only-password", database="hb_legacy", host="localhost"
+              )
+              try:
+                  row = await connection.fetchrow(
+                      "SELECT birth_day, birth_month, birth_year, legacy_age FROM employees"
+                  )
+                  assert tuple(row) == (29, 2, None, 35)
+              finally:
+                  await connection.close()
+
+          asyncio.run(verify())
+          PY
+
+  docker:
+    name: Docker build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: hb-bot:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Run packaged migrations inside the image
+        run: |
+          docker run --rm \
+            -e DATABASE_URL=sqlite+aiosqlite:////tmp/hb-docker.sqlite3 \
+            hb-bot:ci hb-migrate

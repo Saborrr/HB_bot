@@ -1,0 +1,51 @@
+services:
+  database:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-hb_bot}
+      POSTGRES_USER: ${POSTGRES_USER:-hb_bot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    security_opt:
+      - no-new-privileges:true
+
+  migrate:
+    build: .
+    restart: "no"
+    command: ["hb-migrate"]
+    env_file: ${ENV_FILE:-.env}
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-hb_bot}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:-hb_bot}
+    depends_on:
+      database:
+        condition: service_healthy
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+
+  bot:
+    build: .
+    restart: unless-stopped
+    env_file: ${ENV_FILE:-.env}
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-hb_bot}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:-hb_bot}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  postgres-data:
